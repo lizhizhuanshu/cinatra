@@ -11,10 +11,12 @@ if(ENABLE_METRIC_JSON)
 endif()
 
 add_executable(${project_name} ${CINATRA_EXAMPLE})
+cinatra_use_third_party_headers(${project_name})
 target_compile_definitions(${project_name} PRIVATE ASYNC_SIMPLE_HAS_NOT_AIO)
 
 if (BUILD_BENCHMARK)
 	add_executable(benchmark benchmark.cpp)
+	cinatra_use_third_party_headers(benchmark)
 	target_compile_definitions(benchmark PRIVATE ASYNC_SIMPLE_HAS_NOT_AIO)
 	if (ENABLE_SSL)
 		target_link_libraries(benchmark ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES})

@@ -9,6 +9,7 @@ add_executable(${project_name}
         test_cmdline.cpp
         main.cpp
         )
+cinatra_use_third_party_headers(${project_name})
 target_compile_definitions(${project_name} PRIVATE ASYNC_SIMPLE_HAS_NOT_AIO INJECT_FOR_HTTP_CLIENT_TEST)
 target_include_directories(${project_name} PRIVATE
         ${cinatra_SOURCE_DIR}/include
@@ -74,6 +75,7 @@ include_directories(${cinatra_SOURCE_DIR}/iguana)
 add_executable(test_corofile
         test_corofile.cpp
         )
+cinatra_use_third_party_headers(test_corofile)
 
 if(ENABLE_FILE_IO_URING)
   if (UNIX)
@@ -94,9 +96,11 @@ add_test(NAME test_corofile COMMAND test_corofile)
 add_executable(test_time_util
         test_time_util.cpp
         )
+cinatra_use_third_party_headers(test_time_util)
 add_test(NAME test_time_util COMMAND test_time_util)
 
 add_executable(test_rlimiter test_token_bucket_rlimiter.cpp)
+cinatra_use_third_party_headers(test_rlimiter)
 
 if (ENABLE_SSL)
     target_link_libraries(test_rlimiter PRIVATE OpenSSL::SSL OpenSSL::Crypto)
@@ -107,6 +111,7 @@ add_test(NAME test_rlimiter COMMAND test_rlimiter)
 add_executable(test_metric
         test_metric.cpp
         )
+cinatra_use_third_party_headers(test_metric)
 
 if (ENABLE_SSL)
     find_package(OpenSSL REQUIRED)
@@ -118,6 +123,7 @@ endif ()
 add_executable(test_http_parse
         test_http_parse.cpp
         )
+cinatra_use_third_party_headers(test_http_parse)
 if (UNIX)
 	if (ENABLE_SSL)
 		target_link_libraries(test_http_parse ${ZLIB_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)

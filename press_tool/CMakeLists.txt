@@ -14,6 +14,7 @@ endif()
 
 add_definitions(-DBENCHMARK_TEST)
 add_executable(${project_name} ${cinatra_press_tool})
+cinatra_use_third_party_headers(${project_name})
 target_compile_definitions(${project_name} PRIVATE ASYNC_SIMPLE_HAS_NOT_AIO)
 
 if (ENABLE_SSL)
@@ -64,6 +65,7 @@ set(unittest_press_tool test_cinatra_press_tool)
 
 if (ENABLE_PRESS_TOOL_TESTS)
     add_executable(${unittest_press_tool} main.cpp)
+    cinatra_use_third_party_headers(${unittest_press_tool})
 
     target_compile_definitions(${unittest_press_tool} PRIVATE ASYNC_SIMPLE_HAS_NOT_AIO PRESS_TOOL_UNITTESTS)
 

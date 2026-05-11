@@ -36,6 +36,7 @@
 #include <asio/write_at.hpp>
 #include <chrono>
 #include <deque>
+#include <tuple>
 #include <vector>
 
 #include "io_context_pool.hpp"
@@ -380,7 +381,7 @@ inline async_simple::coro::Lazy<
     async_simple::Try<typename util::function_traits<Func>::return_type>>
 post(Func func,
      coro_io::ExecutorWrapper<> *e = coro_io::get_global_block_executor()) {
-  co_return co_await post(std::move(func), e->get_asio_executor());
+  co_return co_await coro_io::post(std::move(func), e->get_asio_executor());
 }
 
 template <typename R>
@@ -450,17 +451,17 @@ async_simple::coro::Lazy<std::pair<
 }
 
 template <typename T>
-inline decltype(auto) select_impl(T &pair) {
+inline decltype(auto) select_impl(T &&pair) {
   using Func = std::tuple_element_t<1, std::remove_cvref_t<T>>;
   using ValueType =
       typename std::tuple_element_t<0, std::remove_cvref_t<T>>::ValueType;
   using return_type = std::invoke_result_t<Func, async_simple::Try<ValueType>>;
 
-  auto &callback = std::get<1>(pair);
+  auto callback = std::get<1>(std::forward<T>(pair));
   if constexpr (coro_io::is_lazy_v<return_type>) {
-    auto executor = std::get<0>(pair).getExecutor();
+    auto executor = std::get<0>(std::forward<T>(pair)).getExecutor();
     return std::make_pair(
-        std::move(std::get<0>(pair)),
+        std::move(std::get<0>(std::forward<T>(pair))),
         [executor, callback = std::move(callback)](auto &&val) {
           if (executor) {
             callback(std::move(val)).via(executor).start([](auto &&) {
@@ -473,40 +474,71 @@ inline decltype(auto) select_impl(T &pair) {
         });
   }
   else {
-    return pair;
+    return std::forward<T>(pair);
+  }
+}
+
+template <typename PairTuple, size_t... I>
+inline auto collect_any_from_pairs(PairTuple &pairs, std::index_sequence<I...>) {
+  return async_simple::coro::collectAny(
+      std::move(std::get<0>(std::get<I>(pairs)))...);
+}
+
+template <size_t I = 0, typename PairTuple, typename Variant>
+inline void invoke_pair_callback(PairTuple &pairs, size_t index,
+                                 Variant &&result) {
+  if constexpr (I < std::tuple_size_v<std::remove_reference_t<PairTuple>>) {
+    if (index == I) {
+      auto &callback = std::get<1>(std::get<I>(pairs));
+      callback(std::get<I>(std::forward<Variant>(result)));
+      return;
+    }
+    invoke_pair_callback<I + 1>(pairs, index, std::forward<Variant>(result));
   }
 }
 
 template <typename... T>
-inline auto select(T &&...args) {
-  return async_simple::coro::collectAny(select_impl(args)...);
+inline async_simple::coro::Lazy<size_t> select(T &&...args) {
+  auto pairs = std::make_tuple(select_impl(std::forward<T>(args))...);
+  auto result = co_await collect_any_from_pairs(pairs, std::index_sequence_for<T...>{});
+  auto index = result.index();
+  invoke_pair_callback(pairs, index, std::move(result));
+  co_return index;
 }
 
 template <typename T, typename Callback>
-inline auto select(std::vector<T> vec, Callback callback) {
-  if constexpr (coro_io::is_lazy_v<Callback>) {
-    std::vector<async_simple::Executor *> executors;
-    for (auto &lazy : vec) {
-      executors.push_back(lazy.getExecutor());
-    }
+inline async_simple::coro::Lazy<size_t> select(std::vector<T> vec,
+                                               Callback callback) {
+  using value_type = typename T::ValueType;
+  using callback_return_type =
+      std::invoke_result_t<Callback, size_t, async_simple::Try<value_type>>;
 
-    return async_simple::coro::collectAny(
-        std::move(vec),
-        [executors, callback = std::move(callback)](size_t index, auto &&val) {
-          auto executor = executors[index];
-          if (executor) {
-            callback(index, std::move(val)).via(executor).start([](auto &&) {
-            });
-          }
-          else {
-            callback(index, std::move(val)).start([](auto &&) {
-            });
-          }
-        });
+  std::vector<async_simple::Executor *> executors;
+  executors.reserve(vec.size());
+  for (auto &lazy : vec) {
+    executors.push_back(lazy.getExecutor());
+  }
+
+  auto result = co_await async_simple::coro::collectAny(std::move(vec));
+  auto index = result.index();
+  auto value = std::move(result._value);
+
+  if constexpr (coro_io::is_lazy_v<callback_return_type>) {
+    auto executor = executors[index];
+    if (executor) {
+      callback(index, std::move(value)).via(executor).start([](auto &&) {
+      });
+    }
+    else {
+      callback(index, std::move(value)).start([](auto &&) {
+      });
+    }
   }
   else {
-    return async_simple::coro::collectAny(std::move(vec), std::move(callback));
+    callback(index, std::move(value));
   }
+
+  co_return index;
 }
 
 template <typename Socket, typename AsioBuffer>
