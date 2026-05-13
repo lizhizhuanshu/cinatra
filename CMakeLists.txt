@@ -10,8 +10,8 @@ FetchContent_Declare(
 )
 FetchContent_Declare(
     async_simple
-    GIT_REPOSITORY https://github.com/alibaba/async_simple.git
-    GIT_TAG v1.3
+    GIT_REPOSITORY https://github.com/lizhizhuanshu/async_simple.git
+    GIT_TAG main
     GIT_SUBMODULES ""
     GIT_SUBMODULES_RECURSE OFF
 )
