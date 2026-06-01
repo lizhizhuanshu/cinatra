@@ -1,33 +1,33 @@
 cmake_minimum_required(VERSION 3.15)
 project(cinatra)
 
-include(FetchContent)
+# ── Dependencies provided by parent project ──────────────────────────────────
+# Parent must set asio_SOURCE_DIR and async_simple_SOURCE_DIR before
+# add_subdirectory(this dir), or set CINATRA_3RD_DIR to a directory
+# containing asio/ and async_simple/ subdirectories.
 
-# ── asio ──────────────────────────────────────────────────────────────────────
-# Reuse from parent if already available, otherwise fetch.
 if(NOT asio_SOURCE_DIR)
-    FetchContent_Declare(
-        asio
-        GIT_REPOSITORY https://github.com/chriskohlhoff/asio.git
-        GIT_TAG asio-1-36-0
-    )
-    FetchContent_MakeAvailable(asio)
+    if(CINATRA_3RD_DIR)
+        set(asio_SOURCE_DIR "${CINATRA_3RD_DIR}/asio" CACHE PATH "asio source dir")
+    else()
+        message(FATAL_ERROR "cinatra requires asio_SOURCE_DIR or CINATRA_3RD_DIR to be set")
+    endif()
 endif()
 
-# ── async_simple ──────────────────────────────────────────────────────────────
-# Reuse from parent if already available, otherwise fetch.
+if(NOT async_simple_SOURCE_DIR)
+    if(CINATRA_3RD_DIR)
+        set(async_simple_SOURCE_DIR "${CINATRA_3RD_DIR}/async_simple" CACHE PATH "async_simple source dir")
+    else()
+        message(FATAL_ERROR "cinatra requires async_simple_SOURCE_DIR or CINATRA_3RD_DIR to be set")
+    endif()
+endif()
+
+# Build async_simple if not already provided by parent
 if(NOT TARGET async_simple)
     set(ASYNC_SIMPLE_BUILD_MODULES OFF CACHE BOOL "" FORCE)
     set(ASYNC_SIMPLE_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
     set(ASYNC_SIMPLE_BUILD_DEMO_EXAMPLE OFF CACHE BOOL "" FORCE)
-    FetchContent_Declare(
-        async_simple
-        GIT_REPOSITORY https://github.com/lizhizhuanshu/async_simple.git
-        GIT_TAG main
-        GIT_SUBMODULES ""
-        GIT_SUBMODULES_RECURSE OFF
-    )
-    FetchContent_MakeAvailable(async_simple)
+    add_subdirectory(${async_simple_SOURCE_DIR})
 endif()
 
 function(cinatra_use_third_party_headers target_name)
